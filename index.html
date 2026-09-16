@@ -386,15 +386,16 @@ function curTab(){return state.tabs.find(t=>t.id===state.ui.activeTab) || state.
 function curRows(){return curTab().rows;}
 
 /* ---------- Supabase Live-Sync (Multi-Tab) ---------- */
-let sb=null, ready=false, pendingReload=false, reloadTimer=null, saveTimer=null;
+let sb=null, ready=false, pendingReload=false, reloadTimer=null, saveTimer=null, dirty=false;
 const snap={};          // rowId -> JSON(data) ; "__loc_"+id -> tab|pos
 const snapMeta={v:null};
 function markDot(t){const d=document.getElementById("savedot");if(d)d.textContent=t;}
-function save(){clearTimeout(saveTimer);markDot("…");saveTimer=setTimeout(pushChanges,300);}
+function save(){dirty=true;clearTimeout(saveTimer);markDot("…");saveTimer=setTimeout(pushChanges,300);}
 function metaObj(){return {project:state.project, ui:state.ui, tabs:state.tabs.map(t=>({id:t.id,name:t.name,fmt:t.fmt||""}))};}
 
 async function pushChanges(){
   if(!ready||!sb)return;
+  dirty=false;
   try{
     const ups=[];
     state.tabs.forEach(t=>t.rows.forEach((r,i)=>{
@@ -412,7 +413,8 @@ async function pushChanges(){
     if(snapMeta.v!==mjs){const{error}=await sb.from("meta").upsert({id:"singleton",data:metaObj()});if(error)throw error;snapMeta.v=mjs;}
     markDot("✓ synchron "+new Date().toLocaleTimeString().slice(0,5));
     setTimeout(()=>{const d=document.getElementById("savedot");if(d&&d.textContent.startsWith("✓"))d.textContent="● live";},1600);
-  }catch(e){console.error("sync",e);markDot("⚠︎ Sync-Fehler (Konsole)");}
+    if(pendingReload && !dirty){pendingReload=false;loadFromDb(true).catch(e=>console.error(e));}
+  }catch(e){console.error("sync",e);dirty=true;markDot("⚠︎ Sync-Fehler — Änderung bleibt lokal, Konsole prüfen");}
 }
 
 async function boot(){
@@ -451,8 +453,8 @@ async function loadFromDb(preserveScroll){
 
 function editingNow(){const a=document.activeElement;return a&&a.closest&&a.closest('#rows tr, .masthead [contenteditable], .section-title [contenteditable]');}
 function scheduleReload(){
-  if(editingNow()){pendingReload=true;return;}
-  clearTimeout(reloadTimer);reloadTimer=setTimeout(()=>loadFromDb(true).catch(e=>console.error(e)),350);
+  if(editingNow() || dirty){pendingReload=true;return;}
+  clearTimeout(reloadTimer);reloadTimer=setTimeout(()=>{ if(editingNow()||dirty){pendingReload=true;return;} loadFromDb(true).catch(e=>console.error(e)); },350);
 }
 function subscribeRealtime(){
   sb.channel("rt-verivox")
