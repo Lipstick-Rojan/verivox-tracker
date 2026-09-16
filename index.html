@@ -257,7 +257,7 @@ function artistPool(){const s=new Set(AI_TEAM);state.tabs.forEach(t=>t.rows.forE
 function R(num,vig,desc){return {num:num, vignette:vig, description:desc||""};}
 
 const DEFAULT_DATA = {
-  project:{number:"1029", name:"Verivox", owner:"Rojan", lastUpdated:"16.09.26 (Board 260914 VO-aligned)"},
+  project:{number:"1029", name:"Verivox", owner:"Rojan", lastUpdated:"16.09.26 (Board 260914 · Gas=15\")"},
   ui:{colors:true, activeTab:"car20"},
   tabs:[
     {id:"car20", name:"Car 20\"", fmt:"Master · 16:9 / 9:16 / 4:5", rows:[
@@ -339,6 +339,11 @@ const DEFAULT_DATA = {
       R("14","Close-up on Booboo all excited, spinning","Close-up on Booboo all excited, spinning and jumping"),
       R("15","“Jetzt Kredite vergleichen und richtig sparen, mit Verivox”","Outro medium wide shot of H&S&B inside kitchen show room, Helen up on Stephan’s hips jumping together and obviously enjoying the moment, different expressions of happiness, need a range of intensity of reaction. Booboo still spinning and jumping. We see Verifox standing in front of kitchen show room, holding his phone into camera and saying: “Jetzt Kredite vergleichen und richtig sparen, mit Verivox“ (alt: “Jetzt Kredite vergleichen und bis zu 40 % sparen, mit Verivox“) Over the closing scene we need enough space to show the Verivox logo and a stamp saying “Bis zu 40 % sparen“"),
     ]},
+    {id:"tagon5", name:"Gas Tag-on 5\"", fmt:"Board: GAS 5’ · Verifox auf Heizung", rows:[
+      R("1","“This is What the Fox Says”","Medium wide shot of Verifox chilling on a blanket on top of a radiator, tail wagging, head slightly nodding along the song “This is What the Fox Says“"),
+      R("2","“Jetzt auch Gas-Tarife vergleichen und bis zu 1.250 € sparen”","We hear the fox saying: “Jetzt auch Gas-Tarife vergleichen und bis zu 1.250 € sparen.“"),
+      R("3","“Bis zu 1.250 € sparen”","Close-up on phone display with gas icon and text: “Bis zu 1.250 € sparen“ (former on-screen text “Sparen Sie bis zu 1250 Euro“ is not in the approved storyboard – tbc)*"),
+    ]},
     {id:"car-cut", name:"Car Cutdowns", fmt:"aus Car 20\" · 15\"/10\"", rows:[
       R("A","15\" Direct cutdown","— WIP — aus Car 20\" zusammenstellen."),
       R("B","10\" Direct cutdown","— WIP —"),
@@ -350,11 +355,6 @@ const DEFAULT_DATA = {
     {id:"loan-cut", name:"Loan Cutdowns", fmt:"aus Loan 20\" · 15\"/10\"", rows:[
       R("A","15\" Direct cutdown","— WIP — aus Loan 20\" zusammenstellen."),
       R("B","10\" Direct cutdown","— WIP —"),
-    ]},
-    {id:"tagon5", name:"Tag-on 5\"", fmt:"Gas-Tag-on (Board: GAS 5’)", rows:[
-      R("1","“This is What the Fox Says”","Medium wide shot of Verifox chilling on a blanket on top of a radiator, tail wagging, head slightly nodding along the song “This is What the Fox Says“"),
-      R("2","“Jetzt auch Gas-Tarife vergleichen und bis zu 1.250 € sparen”","We hear the fox saying: “Jetzt auch Gas-Tarife vergleichen und bis zu 1.250 € sparen.“"),
-      R("3","“Bis zu 1.250 € sparen”","Close-up on phone display with gas icon and text: “Bis zu 1.250 € sparen“ (former on-screen text “Sparen Sie bis zu 1250 Euro“ is not in the approved storyboard – tbc)*"),
     ]},
   ]
 };
