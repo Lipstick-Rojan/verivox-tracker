@@ -620,13 +620,26 @@ function linkify(s){return esc(s).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" t
 
 function paintImg(el,d,ph){if(d){el.style.backgroundImage=`url(${d})`;el.innerHTML=""}else{el.style.backgroundImage="";el.innerHTML=`<span class="ph">${esc(ph).replace(/\n/g,"<br>")}</span>`}}
 function fileToDataUrl(f,cb){if(!f||!f.type.startsWith("image/"))return;const r=new FileReader();r.onload=()=>cb(r.result);r.readAsDataURL(f)}
+async function putImage(file,cb){
+  if(!file||!file.type.startsWith("image/"))return;
+  if(!sb){fileToDataUrl(file,cb);return;}
+  markDot("Bild wird hochgeladen…");
+  try{
+    const ext=((file.type.split("/")[1]||"jpg").split("+")[0]).replace(/[^a-z0-9]/gi,"")||"jpg";
+    const path="v"+Date.now()+"_"+Math.random().toString(36).slice(2,7)+"."+ext;
+    const {error}=await sb.storage.from("pics").upload(path,file,{contentType:file.type,upsert:true});
+    if(error)throw error;
+    const {data}=sb.storage.from("pics").getPublicUrl(path);
+    cb(data.publicUrl); markDot("● live");
+  }catch(e){console.error("upload",e);markDot("⚠︎ Upload-Fehler — lokale Vorschau");fileToDataUrl(file,cb);}
+}
 function wireImage(el,onSet,onClear){
   el.addEventListener("click",e=>{if(e.target.classList.contains("rm")){e.stopPropagation();onClear&&onClear();return}
-    const i=document.createElement("input");i.type="file";i.accept="image/*";i.onchange=()=>fileToDataUrl(i.files[0],onSet);i.click()});
+    const i=document.createElement("input");i.type="file";i.accept="image/*";i.onchange=()=>putImage(i.files[0],onSet);i.click()});
   el.addEventListener("dragover",e=>{e.preventDefault();el.classList.add("dragover")});
   el.addEventListener("dragleave",()=>el.classList.remove("dragover"));
-  el.addEventListener("drop",e=>{e.preventDefault();el.classList.remove("dragover");const f=e.dataTransfer.files&&e.dataTransfer.files[0];if(f)fileToDataUrl(f,onSet)});
-  el.addEventListener("paste",e=>{const it=e.clipboardData&&e.clipboardData.items;if(!it)return;for(const x of it){if(x.type.startsWith("image/")){fileToDataUrl(x.getAsFile(),onSet);e.preventDefault();break}}});
+  el.addEventListener("drop",e=>{e.preventDefault();el.classList.remove("dragover");const f=e.dataTransfer.files&&e.dataTransfer.files[0];if(f)putImage(f,onSet)});
+  el.addEventListener("paste",e=>{const it=e.clipboardData&&e.clipboardData.items;if(!it)return;for(const x of it){if(x.type.startsWith("image/")){putImage(x.getAsFile(),onSet);e.preventDefault();break}}});
   el.tabIndex=0;
 }
 function addRow(){const t=Math.max(0,...curRows().map(r=>parseInt(r.num,10)).filter(n=>!isNaN(n)))+1;curRows().push(newRow({num:String(t)}));save();render();window.scrollTo(0,document.body.scrollHeight)}
