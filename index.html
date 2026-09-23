@@ -413,7 +413,6 @@ async function pushChanges(){
     if(snapMeta.v!==mjs){const{error}=await sb.from("meta").upsert({id:"singleton",data:metaObj()});if(error)throw error;snapMeta.v=mjs;}
     markDot("✓ synchron "+new Date().toLocaleTimeString().slice(0,5));
     setTimeout(()=>{const d=document.getElementById("savedot");if(d&&d.textContent.startsWith("✓"))d.textContent="● live";},1600);
-    if(pendingReload && !dirty){pendingReload=false;loadFromDb(true).catch(e=>console.error(e));}
   }catch(e){console.error("sync",e);dirty=true;markDot("⚠︎ Sync-Fehler — Änderung bleibt lokal, Konsole prüfen");}
 }
 
@@ -452,24 +451,71 @@ async function loadFromDb(preserveScroll){
 }
 
 function editingNow(){const a=document.activeElement;return a&&a.closest&&a.closest('#rows tr, .masthead [contenteditable], .section-title [contenteditable]');}
-function scheduleReload(){
-  if(editingNow() || dirty){pendingReload=true;return;}
-  clearTimeout(reloadTimer);reloadTimer=setTimeout(()=>{ if(editingNow()||dirty){pendingReload=true;return;} loadFromDb(true).catch(e=>console.error(e)); },350);
+function rowFocused(id){const a=document.activeElement;return a&&a.closest&&a.closest('tr[data-id="'+id+'"]');}
+function findLoc(id){for(const t of state.tabs){const i=t.rows.findIndex(r=>r.id===id);if(i>=0)return{tab:t,idx:i};}return null;}
+function replaceRowDom(id){
+  const idx=curRows().findIndex(r=>r.id===id);
+  const tr=document.querySelector('#rows tr[data-id="'+id+'"]');
+  if(idx<0){ if(tr) tr.remove(); return; }
+  const nt=renderRow(curRows()[idx],idx);
+  if(tr) tr.replaceWith(nt); else renderRows();
+}
+/* Realtime: NUR die geänderte Zeile gezielt aktualisieren — die bearbeitete Zeile NIE anfassen (kein Voll-Render, kein Fokus-Verlust). */
+function applyRemoteRow(rec){
+  const data=rec.data, id=(data&&data.id)||rec.id, tabId=rec.tab, pos=rec.pos;
+  if(snap[id]===JSON.stringify(data)){snap["__loc_"+id]=tabId+"|"+pos;return;} // eigener Echo
+  snap[id]=JSON.stringify(data); snap["__loc_"+id]=tabId+"|"+pos;
+  if(rowFocused(id)) return; // wird gerade getippt -> in Ruhe lassen
+  const loc=findLoc(id), target=state.tabs.find(t=>t.id===tabId);
+  if(loc && loc.tab.id===tabId){
+    loc.tab.rows[loc.idx]=newRow(data);
+    if(tabId===state.ui.activeTab) replaceRowDom(id); else renderTabs();
+  } else {
+    if(loc) loc.tab.rows.splice(loc.idx,1);
+    if(target){ target.rows.splice(Math.min(pos,target.rows.length),0,newRow(data)); }
+    if(!editingNow()) renderRows();
+    renderTabs();
+  }
+  updateCount();
+}
+function applyRemoteDelete(id){
+  if(snap[id]===undefined) return; // haben wir selbst gelöscht
+  delete snap[id]; delete snap["__loc_"+id];
+  const loc=findLoc(id); if(!loc) return;
+  const wasActive=loc.tab.id===state.ui.activeTab;
+  loc.tab.rows.splice(loc.idx,1);
+  if(wasActive && !editingNow()){ renderRows(); }
+  else { const tr=document.querySelector('#rows tr[data-id="'+id+'"]'); if(tr && !editingNow()) tr.remove(); }
+  renderTabs(); updateCount();
+}
+function applyRemoteMeta(m){
+  if(!m) return; snapMeta.v=JSON.stringify(m);
+  if(m.project) state.project=m.project;
+  if(m.ui){ const at=state.ui.activeTab; state.ui=m.ui; if(!state.ui.activeTab) state.ui.activeTab=at; }
+  if(m.tabs){
+    const byId={}; state.tabs.forEach(t=>byId[t.id]=t);
+    state.tabs=m.tabs.map(td=>{const ex=byId[td.id]; return {id:td.id,name:td.name,fmt:td.fmt||"",rows:ex?ex.rows:[]};});
+    if(!state.tabs.find(t=>t.id===state.ui.activeTab)&&state.tabs[0]) state.ui.activeTab=state.tabs[0].id;
+  }
+  const foc=document.activeElement;
+  document.querySelectorAll("[data-bind]").forEach(el=>{
+    if(el.isContentEditable && el===foc) return;
+    const key=el.getAttribute("data-bind"); let v; const t=curTab();
+    if(key==="_tabname")v=t.name; else if(key==="_tabfmt")v=t.fmt?("· "+t.fmt):""; else{const p=key.split(".");v=state;for(const k of p)v=v?.[k];}
+    el.textContent=v??"";
+  });
+  document.querySelector('.sheet').classList.toggle('colors-on',!!(state.ui&&state.ui.colors));
+  const tc=document.getElementById('toggleColors');if(tc)tc.checked=!!(state.ui&&state.ui.colors);
+  renderTabs(); renderLegend(); updateCount();
 }
 function subscribeRealtime(){
   sb.channel("rt-verivox")
     .on("postgres_changes",{event:"*",schema:"public",table:"rows"},p=>{
-      if(p.eventType==="DELETE"){ if(snap[p.old.id]!==undefined) scheduleReload(); return; }
-      const id=(p.new.data&&p.new.data.id)||p.new.id;
-      if(snap[id]===JSON.stringify(p.new.data) && snap["__loc_"+id]===p.new.tab+"|"+p.new.pos) return;
-      scheduleReload();
+      if(p.eventType==="DELETE") applyRemoteDelete(p.old.id); else applyRemoteRow(p.new);
     })
-    .on("postgres_changes",{event:"*",schema:"public",table:"meta"},p=>{
-      if(snapMeta.v===JSON.stringify(p.new.data)) return; scheduleReload();
-    })
+    .on("postgres_changes",{event:"*",schema:"public",table:"meta"},p=>applyRemoteMeta(p.new.data))
     .subscribe(s=>{if(s==="SUBSCRIBED")markDot("● live · alle Änderungen werden geteilt")});
 }
-document.addEventListener("blur",()=>{ if(pendingReload && !editingNow()){pendingReload=false;setTimeout(()=>{if(!editingNow())loadFromDb(true).catch(e=>console.error(e))},250);} },true);
 
 function render(){
   const t=curTab();
